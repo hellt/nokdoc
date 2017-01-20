@@ -1,3 +1,4 @@
+![rationale](http://img-fotki.yandex.ru/get/41743/21639405.11d/0_8bea9_ab188260_orig.jpg)
 # About
 NokDoc CLI Tool built to interact with Nokia (fALU) [documentation portal](https://support.alcatel-lucent.com) in a CLI fashion.
 

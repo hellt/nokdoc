@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="NokDoc">
+    <meta name="author" content="Roman Dodin">
+    <link rel="shortcut icon" href="http://cdn.rawgit.com/hellt/nokdoc/82132b04b6ff4e5281e73787a4014231c67dbdf6/template/favicon.ico">
+
+    <title>NokDoc</title>
+
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+
+    <link href="https://rawgit.com/hellt/bc4fc51d6f1b9584605517f5c8d6a5a0/raw/0c95004aab0b7158fb8d0485439fa2ec11b049a1/jumbotron-narrow.css" rel="stylesheet" type="text/css" />
+
+
+  </head>
+
+  <body>
+
+    <div class="container">
+      <div class="header clearfix">
+        <nav>
+          <ul class="nav nav-pills pull-right">
+            <!-- <li role="presentation" class="active"><a href="#">Home</a></li> -->
+            <li role="presentation"><a href="#">About NokDoc</a></li>
+            <!-- <li role="presentation"><a href="#">Contact</a></li> -->
+          </ul>
+        </nav>
+        <h3 class="text-muted"><a href="https://nokdoc.github.io/">NokDoc</a></h3>
+      </div>
+      <div class="row">
+          <!-- <div class="page-header">
+            <h3>Documentation</h3>
+          </div> -->
+          <div class="col-md-12">
+              <h3>Documentation set for
+                  <code>{% filter upper %}{{ product }}{% endfilter %}</code>
+                  {% if release %}
+                  release <code>{% filter upper %}{{ release }}{% endfilter %}</code>
+                  {% endif %}
+                  <small>generated on {{gen_date}}</small></h3></div>
+          <div class="col-md-12">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Doc. ID</th>
+                    <th>Issue / Date</th>
+                    <th>Links</th>
+                  </tr>
+                </thead>
+                <tbody>
+                {% for docdata in docs_list %}
+                {# http://jinja.pocoo.org/docs/dev/tricks/#accessing-the-parent-loop #}
+                {% set docsloop = loop %}
+                 {% for doc_id, doc in docdata.items() %}
+                  <tr>
+                    <td>{{ docsloop.index }}</td>
+                    <td>{{ doc['title']|e }}</td>
+                    <td>{{ doc_id|e }}</td>
+                    <td>{{ doc['issue']|e }} / {{ doc['issue_date']|e }}</td>
+                    <td>
+                    {% for l in doc['links'] %}
+                    <a href="{{ l[0] }}">{{ l[1] }} </a>
+                    {% endfor %}
+                    </td>
+                  </tr>
+                 {% endfor %}
+                {% endfor %}
+                </tbody>
+              </table>
+           </div>
+      </div>
+
+
+      <footer class="footer">
+        <p>&copy; 2017 <a href="https://www.linkedin.com/in/rdodin">Roman Dodin</a></p>
+      </footer>
+
+    </div> <!-- /container -->
+
+
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <!-- <script src="../../assets/js/ie10-viewport-bug-workaround.js"></script> -->
+  </body>
+</html>

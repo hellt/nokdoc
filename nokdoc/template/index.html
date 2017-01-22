@@ -17,6 +17,16 @@
 
     <link href="https://rawgit.com/hellt/bc4fc51d6f1b9584605517f5c8d6a5a0/raw/0c95004aab0b7158fb8d0485439fa2ec11b049a1/jumbotron-narrow.css" rel="stylesheet" type="text/css" />
 
+    <style type="text/css">
+        td .glyphicon {
+            font-size: 10px;
+            top: 0px
+        }
+
+        body {
+            font-family: "Nokia Pure Text","Helvetica Neue",Helvetica,Arial,sans-serif
+        }
+    </style>
 
   </head>
 
@@ -27,7 +37,7 @@
         <nav>
           <ul class="nav nav-pills pull-right">
             <!-- <li role="presentation" class="active"><a href="#">Home</a></li> -->
-            <li role="presentation"><a href="#">About NokDoc</a></li>
+            <li role="presentation"><a href="http://noshut.ru/2017/01/nokdoc/">About NokDoc</a></li>
             <!-- <li role="presentation"><a href="#">Contact</a></li> -->
           </ul>
         </nav>
@@ -63,7 +73,7 @@
                   <tr>
                     <td>{{ docsloop.index }}</td>
                     <td>{{ doc['title']|e }}</td>
-                    <td>{{ doc_id|e }}</td>
+                    <td>{{ doc_id|e }} {% if doc['restricted'] %}<span class="glyphicon glyphicon-lock" aria-hidden="true"></span>{% endif %}</td>
                     <td>{{ doc['issue']|e }} / {{ doc['issue_date']|e }}</td>
                     <td>
                     {% for l in doc['links'] %}
@@ -84,7 +94,6 @@
       </footer>
 
     </div> <!-- /container -->
-
 
     <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
     <!-- <script src="../../assets/js/ie10-viewport-bug-workaround.js"></script> -->

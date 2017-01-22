@@ -78,13 +78,23 @@ def user_auth(s, login, pwd):
         return s
 
 
-def parseDocdata(rawDoc, login):
+@click.pass_context
+def parseDocdata(ctx, rawDoc):
     """
     Parses a raw HTML document which comes as a reply from a GET request
     towards the documentation server.
     Returns a list with dicts where each dict represents a single doc
     entry with its properties
     """
+
+    # using thts link no login required to get the list of nuage docs
+    # but that list wont have links to HTML docs, only PDFs
+    # though we can construct links to HTML by having doc_id only
+    # https://infoproducts.alcatel-lucent.com/cgi-bin/get_doc_list.pl?&entry_id=1-0000000000662&srch_how=Full%20Text&srch_str=&release=4.0.R6.1
+
+    # with this link you get both PDF and HTML links for nuage family
+    # but it requires login and have no info about restricted status of docs
+    # https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_get_doc_list.pl?&entry_id=1-0000000000662&srch_how=Full%20Text&srch_str=&release=4.0.R6.1
 
     doc_list = []
     td_contents_patt = re.compile(r'<td.+?>(.+?)</td>')
@@ -109,28 +119,32 @@ def parseDocdata(rawDoc, login):
         # as a workaroung I will validate every </td>
         raw_entry = re.sub(r'</t\S*d>', '</td>', raw_entry)
 
+        # example: https://regex101.com/r/NhwnOp/1
         td_contents = td_contents_patt.findall(raw_entry)
         if td_contents:
-            if 'a login is required for access' in td_contents[1] and not login:
+            if 'a login is required for access' in td_contents[1] \
+                    and not ctx.obj['LOGGED_IN']:
                 if show_restricted_docs_notification:
                     click.echo('    The following documents are available to logged in users only. They will not be included in the documentation set...')
                     show_restricted_docs_notification = False
                 click.echo('      ' + td_contents[0].strip())
                 continue
             # click.echo('Adding doc {}'.format(td_contents[0]))
-            doc_data.update(parse_td(td_contents))
+            doc_data.update(parse_td(raw_td=td_contents))
 
             # when dealing with combined product some docs might be in
             # both sections. Append only unique docs.
             if doc_data not in doc_list:
                 doc_list.append(doc_data)
-
+    # pprint(doc_list)
+    # os.sys.exit()
     return doc_list
 
 
-def parse_td(raw_td):
+@click.pass_context
+def parse_td(ctx, raw_td):
     """
-    DIssects given <td> elements from a singe <tr> element. A single <tr>
+    Dissects given <td> elements from a singe <tr> element. A single <tr>
     element represents a single document and its properties.
     Returns a dict with key as doc_id and value as a dict with doc properties
     """
@@ -140,14 +154,25 @@ def parse_td(raw_td):
     # key = re.sub('<nobr>|</nobr>', '', raw_td[1]).strip()
     # key is doc_id
     key = re.search(r'>(.*?)<', raw_td[1]).group(1).strip()
+
+    # collect info if a doc is restricted to later show lock icon in HTML
+    # for those docs which are with a restricted access
+    if 'a login is required for access' in raw_td[1]:
+        is_restricted = True
+    else:
+        is_restricted = False
+
     d[key] = {'title': raw_td[0].strip(),
               'issue': raw_td[2].strip(),
               'issue_date': re.sub('<nobr>|</nobr>', '', raw_td[3]).strip(),
-              'links': parse_td_links(raw_td[4])}
+              'links': parse_td_links(raw_links=raw_td[4], doc_id=key),
+              'restricted': is_restricted
+              }
     return d
 
 
-def parse_td_links(raw_links):
+@click.pass_context
+def parse_td_links(ctx, raw_links, doc_id):
     """
     Parsing links contained in the last <td> elements.
     returns: list of tuples
@@ -157,14 +182,22 @@ def parse_td_links(raw_links):
     # https://regex101.com/r/7iAqds/1
     links_n_types_patt = re.compile(r"href='(.*?)'.*?title='(.*?)'")
     for url_n_type in links_n_types_patt.findall(raw_links):
-        l_type = None
+        link = url_n_type[0]
+        l_type = None  # link type
         if 'PDF' in url_n_type[1].upper():
             l_type = 'PDF'
         elif 'ZIP' in url_n_type[1].upper():
             l_type = 'ZIP'
         elif 'HTML' in url_n_type[1].upper():
             l_type = 'HTML'
-        links.append((url_n_type[0], l_type))
+
+            # for nuage products I need to construct HTML href manually
+            # since I use the HTTP API endpoint which has no direct HTML links
+            # see comments in parseDocdata() func for further explanation
+            if 'nuage' in ctx.params['product']:
+                link = 'https://infoproducts.alcatel-lucent.com/aces/htdocs/{}/index.html'.format(doc_id)
+
+        links.append((link, l_type))
     return links
 
 
@@ -274,6 +307,8 @@ def get_json_resp(responce):
     Sometimes documentation server returns junk data before
     json responce. This will raise decode exception.
     Strip this data if any
+    for example this one gives trouble if using .json() instead
+    nokdoc -l rdodin getlinks -p nuage-vns -r 4.0.r6
     '''
     try:
         json_resp = responce.json()
@@ -286,7 +321,11 @@ def get_json_resp(responce):
 
 
 def validate_product(ctx, param, value):
+    # global get_doc_url
     if 'nuage' in value:
+        # # nuage API endpoint for fetching links differs from others
+        # get_doc_url = 'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_get_doc_list.pl'
+
         # quit if no login was passed for Nuage docs
         if not ctx.obj['LOGGED_IN']:
             click.echo('  Nuage Networks documentation can be accessed by authorized users only!\n'
@@ -365,9 +404,6 @@ def getlinks(ctx, product, release, format, sort, verbose):
     # arr = [tmp[i:i + 6] for i in range(0, len(tmp), 6)]
     # pprint(arr)
 
-    # <td.+?>(.+?)</td>
-    # test_l = ['a','b','c','d']
-
     # mapping of cli options for sotring and values for API calls
     sort_opts = {'title': 'Title, A-Z',
                  'issue_date': 'Issue Date'}
@@ -378,15 +414,8 @@ def getlinks(ctx, product, release, format, sort, verbose):
     if format:
         long_format = formats[format]
 
-    # # for nuage family 'get_doc_url' URL differs from 7750
-    # if 'nuage' in product:
-    #     # quit if no login was passed for Nuage docs
-    #     if not ctx.obj['LOGGED_IN']:
-    #         click.echo('  Nuage Networks documentation can be accessed by authorized users only!\n'
-    #                    '  Pass your login as "-l your_login" if you have one.\n'
-    #                    '  Aborting...')
-    #         os.sys.exit()
-        get_doc_url = 'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_get_doc_list.pl'
+    # for nuage family 'get_doc_url' URL differs from 7750
+        # get_doc_url = 'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_get_doc_list.pl'
 
     click.echo('  Querying the documentation server...')
 
@@ -433,7 +462,7 @@ def getlinks(ctx, product, release, format, sort, verbose):
     # docdata = "<div><table style='width: 100%;border-collapse:collapse'><tbody><tr style='border-top: 1px solid black !important;border-bottom: 1px solid black !important;'><th style='text-align: left;width: 55%;'>Title</th><th style='text-align: left;width: 12%;'>Document</th><th>Issue&#160;&#160;&#160;</th><th style='text-align: center;'>Issue Date</th><th style='text-align: left;'>Format</th></tr><tr style='background-color:#E9E9E9;' > <td style='font-weight: 600'>7450 ESS and 7750 SR Troubleshooting Guide </td><td style='size: 140px;font-weight: 500'><nobr>3HE 11475 AAAA TQZZA 01 <img title='Key means document is restricted and a login is required for access.' src='/images/prodcontent_key.gif'></nobr></td> <td style='text-align:center' class='T5'>1</td> <td style='text-align:center' class='T5'><nobr>Dec 8, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_doc_list.pl?entry_id=1-0000000002238&srch_how=Title&release=14.0' target='_self' ><img src='/images/pdficon.jpg' title='PDF document' width='20' height='20' style='border-style:none'></a></nobr></td></tr><tr style='background-color:#FFFFFF;' > <td style='font-weight: 600'>7450 ESS, 7750 SR, and 7950 XRS Multicast Routing Protocols Guide R14.0.R4 </td><td style='size: 140px;font-weight: 500'><nobr>3HE 10795 AAAB TQZZA 02 </nobr></td> <td style='text-align:center' class='T5'>2</td> <td style='text-align:center' class='T5'><nobr>Dec 2, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/cgi-bin/dbaccessfilename.cgi/3HE10795AAABTQZZA02_V1_7450 ESS 7750 SR and 7950 XRS Multicast Routing Protocols Guide R14.0.R4.pdf' target='_blank' ><img src='/images/pdficon.jpg' title='PDF document' width='20' height='20' style='border-style:none'></a></nobr></td></tr><tr style='background-color:#E9E9E9;' > <td style='font-weight: 600'>SR OS 14.0.R6 Software Release Notes </td><td style='size: 140px;font-weight: 500'><nobr>3HE10818 0006 TQZZA 02 <img title='Key means document is restricted and a login is required for access.' src='/images/prodcontent_key.gif'></nobr></td> <td style='text-align:center' class='T5'>1</td> <td style='text-align:center' class='T5'><nobr>Nov 29, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_doc_list.pl?entry_id=1-0000000002238&srch_how=Title&release=14.0' target='_self' ><img src='/images/pdficon.jpg' title='PDF document' width='20' height='20' style='border-style:none'></a></nobr></td></tr><tr style='background-color:#FFFFFF;' > <td style='font-weight: 600'>SR_OS_14.0_AA_Protocols_and_Applications </td><td style='size: 140px;font-weight: 500'><nobr>3HE10817AAAATQZZA07 <img title='Key means document is restricted and a login is required for access.' src='/images/prodcontent_key.gif'></nobr></td> <td style='text-align:center' class='T5'>1</td> <td style='text-align:center' class='T5'><nobr>Nov 23, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_doc_list.pl?entry_id=1-0000000002238&srch_how=Title&release=14.0' target='_self' ><img src='/images/htmlicon.jpg' title='HTML document' width='20' height='20' style='border-style: none'></a></nobr></td></tr><tr style='background-color:#E9E9E9;' > <td style='font-weight: 600'>7450 ESS, 7750 SR, and 7950 XRS Zipped Collection R14.0.R4  </td><td style='size: 140px;font-weight: 500'><nobr>3HE 10800 AAAB TQZZA 01 </nobr></td> <td style='text-align:center' class='T5'>4</td> <td style='text-align:center' class='T5'><nobr>Nov 22, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/archive/834565-Issue4.834565.zip' target='_blank' ><img src='/images/zip.jpg' title='Collection of documents in zip format.' width='20' height='20' style='border-style: none'></a></nobr></td></tr><tr style='background-color:#FFFFFF;' > <td style='font-weight: 600'>7450 ESS, 7750 SR, and 7950 XRS Multiservice Integrated Service Adapter Guide R14.0.R6 </td><td style='size: 140px;font-weight: 500'><nobr>3HE 10801 AAAC TQZZA 01 </nobr></td> <td style='text-align:center' class='T5'>1</td> <td style='text-align:center' class='T5'><nobr>Nov 22, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/cgi-bin/dbaccessfilename.cgi/3HE10801AAACTQZZA01_V1_7450 ESS 7750 SR and 7950 XRS Multiservice Integrated Service Adapter Guide R14.0.R6.pdf' target='_blank' ><img src='/images/pdficon.jpg' title='PDF document' width='20' height='20' style='border-style:none'></a>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/html/3HE10801AAACTQZZA01/index.html' target='_blank' ><img src='/images/htmlicon.jpg' title='HTML document' width='20' height='20' style='border-style: none'></a></nobr></td></tr>"
 
     click.echo('\n  Checking documentation access rights...')
-    docs_list = parseDocdata(docdata, ctx.obj['LOGGED_IN'])
+    docs_list = parseDocdata(docdata)
 
     # if doc_list is empty --> abort
     if not docs_list:

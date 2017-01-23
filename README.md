@@ -40,7 +40,20 @@ curl https://raw.githubusercontent.com/mitsuhiko/pipsi/master/get-pipsi.py | pyt
 ```
 Pay attention to the python interpreter version after the pipe. NokDoc has been tested with `python3` that is why `python3` interpreter should be used to install pipsi. On your installation there might not be `python3` but `python3.5` executable. Yes, it works with `python2.7`, but I do not test it.
 
-Also ensure that you have met pipsi requirement to add additional path to your `PATH` env. variable. On Mac OS and Ubuntu systems pipsi might tell you how to do that in the end of its installation process.
+Also ensure that you have met pipsi requirement to add additional path to your `PATH` env. variable. On Mac OS and Ubuntu systems pipsi might tell you how to do that in the end of its installation process:
+```shell
+Warning:
+  It looks like /home/vagrant/.local/bin is not on your PATH so pipsi will
+  not work out of the box.  To fix this problem make sure to
+  add this to your .bashrc / .profile file:
+
+  export PATH=/home/vagrant/.local/bin:$PATH
+
+# adding new path to $PATH
+echo "export PATH=/home/vagrant/.local/bin:$PATH" >> ~/.profile
+# (re-open your session to changes take effect)
+# or issue "source ~/.profile"
+```
 
 ## Installing NokDoc
 Once you have pipsi installed you can safely install NokDoc:

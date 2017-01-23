@@ -387,8 +387,7 @@ def cli(ctx, proxy, login):
 @click.option('-s', '--sort', default='title',
               type=click.Choice(['title', 'issue_date']),
               help='Choose sorting key. Defaults to "title"')
-@click.option('-v', '--verbose', default=False, help='Make a Doc talk')
-def getlinks(ctx, product, release, format, sort, verbose):
+def getlinks(ctx, product, release, format, sort):
     '''
     Gets a single HTML file with links to the documetation elements for a given
     product.

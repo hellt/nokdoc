@@ -10,6 +10,7 @@ import json
 from jinja2 import Environment, PackageLoader
 import tqdm
 from natsort import natsorted, ns
+import yaml
 
 # disable unverified SSL certs warning
 # which occurs for infoproducts.alcatel-lucent.com server
@@ -194,7 +195,7 @@ def parse_td_links(ctx, raw_links, doc_id):
             # for nuage products I need to construct HTML href manually
             # since I use the HTTP API endpoint which has no direct HTML links
             # see comments in parseDocdata() func for further explanation
-            if 'nuage' in ctx.params['product']:
+            if 'nuage' in ctx.obj['PRODUCT']:
                 link = 'https://infoproducts.alcatel-lucent.com/aces/htdocs/{}/index.html'.format(doc_id)
 
         links.append((link, l_type))
@@ -215,7 +216,7 @@ def create_doc_html(docs_list, product, release):
     env = Environment(loader=PackageLoader('nokdoc', 'template'),
                       trim_blocks=True,
                       lstrip_blocks=True)
-    template = env.get_template('index.html')
+    template = env.get_template('nokdoc_docset.html')
     with open(fname, 'w') as f:
         html = template.render(docs_list=docs_list, product=product,
                                release=release,
@@ -416,7 +417,8 @@ def getlinks(ctx, product, release, format, sort):
     # for nuage family 'get_doc_url' URL differs from 7750
         # get_doc_url = 'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_get_doc_list.pl'
 
-    click.echo('  Querying the documentation server...')
+    click.echo('  Querying the documentation server '
+               'for {} release {}...'.format(product, release))
 
     # list with requests responces
     responces = []
@@ -430,9 +432,9 @@ def getlinks(ctx, product, release, format, sort):
     # if we are dealing with composed doc section (like 'nuage')
     # go through every enclosed doc_id and populate a list with responces
     if type(doc_id[product]) is list:
-        for doc_id in doc_id[product]:
+        for entry_id in doc_id[product]:
             # redefine entry_id
-            params.update({'entry_id': doc_id})
+            params.update({'entry_id': entry_id})
             # pprint(params)
             responces.append(get_json_resp(ctx.obj['SESSION'].get(get_doc_url, params=params)))
     else:
@@ -457,10 +459,9 @@ def getlinks(ctx, product, release, format, sort):
     for i in responces:
         docdata += i['proddata']['docdata']
 
-    # docdata set for offline testing
-    # docdata = "<div><table style='width: 100%;border-collapse:collapse'><tbody><tr style='border-top: 1px solid black !important;border-bottom: 1px solid black !important;'><th style='text-align: left;width: 55%;'>Title</th><th style='text-align: left;width: 12%;'>Document</th><th>Issue&#160;&#160;&#160;</th><th style='text-align: center;'>Issue Date</th><th style='text-align: left;'>Format</th></tr><tr style='background-color:#E9E9E9;' > <td style='font-weight: 600'>7450 ESS and 7750 SR Troubleshooting Guide </td><td style='size: 140px;font-weight: 500'><nobr>3HE 11475 AAAA TQZZA 01 <img title='Key means document is restricted and a login is required for access.' src='/images/prodcontent_key.gif'></nobr></td> <td style='text-align:center' class='T5'>1</td> <td style='text-align:center' class='T5'><nobr>Dec 8, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_doc_list.pl?entry_id=1-0000000002238&srch_how=Title&release=14.0' target='_self' ><img src='/images/pdficon.jpg' title='PDF document' width='20' height='20' style='border-style:none'></a></nobr></td></tr><tr style='background-color:#FFFFFF;' > <td style='font-weight: 600'>7450 ESS, 7750 SR, and 7950 XRS Multicast Routing Protocols Guide R14.0.R4 </td><td style='size: 140px;font-weight: 500'><nobr>3HE 10795 AAAB TQZZA 02 </nobr></td> <td style='text-align:center' class='T5'>2</td> <td style='text-align:center' class='T5'><nobr>Dec 2, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/cgi-bin/dbaccessfilename.cgi/3HE10795AAABTQZZA02_V1_7450 ESS 7750 SR and 7950 XRS Multicast Routing Protocols Guide R14.0.R4.pdf' target='_blank' ><img src='/images/pdficon.jpg' title='PDF document' width='20' height='20' style='border-style:none'></a></nobr></td></tr><tr style='background-color:#E9E9E9;' > <td style='font-weight: 600'>SR OS 14.0.R6 Software Release Notes </td><td style='size: 140px;font-weight: 500'><nobr>3HE10818 0006 TQZZA 02 <img title='Key means document is restricted and a login is required for access.' src='/images/prodcontent_key.gif'></nobr></td> <td style='text-align:center' class='T5'>1</td> <td style='text-align:center' class='T5'><nobr>Nov 29, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_doc_list.pl?entry_id=1-0000000002238&srch_how=Title&release=14.0' target='_self' ><img src='/images/pdficon.jpg' title='PDF document' width='20' height='20' style='border-style:none'></a></nobr></td></tr><tr style='background-color:#FFFFFF;' > <td style='font-weight: 600'>SR_OS_14.0_AA_Protocols_and_Applications </td><td style='size: 140px;font-weight: 500'><nobr>3HE10817AAAATQZZA07 <img title='Key means document is restricted and a login is required for access.' src='/images/prodcontent_key.gif'></nobr></td> <td style='text-align:center' class='T5'>1</td> <td style='text-align:center' class='T5'><nobr>Nov 23, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_doc_list.pl?entry_id=1-0000000002238&srch_how=Title&release=14.0' target='_self' ><img src='/images/htmlicon.jpg' title='HTML document' width='20' height='20' style='border-style: none'></a></nobr></td></tr><tr style='background-color:#E9E9E9;' > <td style='font-weight: 600'>7450 ESS, 7750 SR, and 7950 XRS Zipped Collection R14.0.R4  </td><td style='size: 140px;font-weight: 500'><nobr>3HE 10800 AAAB TQZZA 01 </nobr></td> <td style='text-align:center' class='T5'>4</td> <td style='text-align:center' class='T5'><nobr>Nov 22, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/archive/834565-Issue4.834565.zip' target='_blank' ><img src='/images/zip.jpg' title='Collection of documents in zip format.' width='20' height='20' style='border-style: none'></a></nobr></td></tr><tr style='background-color:#FFFFFF;' > <td style='font-weight: 600'>7450 ESS, 7750 SR, and 7950 XRS Multiservice Integrated Service Adapter Guide R14.0.R6 </td><td style='size: 140px;font-weight: 500'><nobr>3HE 10801 AAAC TQZZA 01 </nobr></td> <td style='text-align:center' class='T5'>1</td> <td style='text-align:center' class='T5'><nobr>Nov 22, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/cgi-bin/dbaccessfilename.cgi/3HE10801AAACTQZZA01_V1_7450 ESS 7750 SR and 7950 XRS Multiservice Integrated Service Adapter Guide R14.0.R6.pdf' target='_blank' ><img src='/images/pdficon.jpg' title='PDF document' width='20' height='20' style='border-style:none'></a>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/html/3HE10801AAACTQZZA01/index.html' target='_blank' ><img src='/images/htmlicon.jpg' title='HTML document' width='20' height='20' style='border-style: none'></a></nobr></td></tr>"
-
     click.echo('\n  Checking documentation access rights...')
+
+    ctx.obj['PRODUCT'] = product
     docs_list = parseDocdata(docdata)
 
     # if doc_list is empty --> abort
@@ -567,3 +568,36 @@ def getdocs(ctx, product, release, format):
 
     download_doc(ctx.obj['SESSION'], doc_dwnld_url, remote_fname, ctx.obj['USERNAME'],
                  local_fname)
+
+
+@cli.command()
+@click.pass_context
+@click.argument('finput')
+def batchgetlinks(ctx, finput):
+    '''
+    Invokes getlinks command for a list of products/releases defined in
+    a YAML file passed as argument
+    '''
+    click.echo('\n  ####### BATCH GET LINKS #######')
+
+    with click.open_file(finput, 'r') as f:
+        products = yaml.load(f)   # load getlinks product/rels file
+
+    # create a 'docs' dir which will hold enclosed dirs with docs per product
+    if not os.path.isdir('docs'):
+        os.mkdir('docs')
+    os.chdir('docs')
+
+    for product in products:
+        if not os.path.isdir(product):
+            os.mkdir(product)
+        os.chdir(product)
+        # pprint(os.getcwd())
+
+        for release in products[product]['releases']:
+            ctx.obj['PRODUCT'] = product
+            # pprint(product + " " + release)
+            if release is None:
+                release=''
+            ctx.invoke(getlinks, product=product, release=release)
+        os.chdir('..')

@@ -155,6 +155,37 @@ Options:
                                   unspecified -> all types will be collected.
   --help                          Show this message and exit.
 ```
+## Batch getlinks operation
+To be able to (re)generate every doc for [nokdoc.github.io](https://nokdoc.github.io)
+a `batchgetlinks` command has been introduced. It opens a configuration file in
+YAML format that contains products and releases one need to get documentation links for.
+Example of such config file:
+```
+7850vsg:
+  releases:
+    -
+7950xrs:
+  releases:
+    - "14.0"
+    - "13.0"
+    - "12.0"
+    - "11.0"
+```
+This file dictates the following: get documentation links for:
+- product 7850vsg which has no releases
+- product 7950xrs for the stated releases
+
+Effectively you will end up with total of 5 HTML files (one for each pair of (product, release))
+grouped under `docs/[product]`.
+
+Under the hood `batchgetlinks` command Invokes `getlinks` command with
+appropriate product and release as inputs.
+
+Refer to this command for example of execution:
+```
+nokdoc -l <username> batchgetlinks batchgetlinks.yml
+```
+Here batchgetlinks.yml file exists in the current working directory.
 ## Exploring available releases
 Obviously almost everytime each command refers to some release for a given product. Yet it is not obvious what releases and in what numbering convention are available to pass into `--release` option.
 
@@ -168,6 +199,20 @@ For this purpose another small command was introduced:
   Available releases for 7750sr family: 4.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, Arbor6.0, Arbor7.0, Arbor7.5, ArborCP5.7, ArborCP5.8p3, ArborCP5.8p4, ArborTMS5.6.P5, ArborTMS5.7.P4, ArborTMS5.8, arborTMS5.8P4, ArborTMS5.8P5, MG3.1, MG4.0, MG5.0, MG6.0, MG7.0, MG8.0
 ```
 # Contribution or requests?
-If you would like to contribute feel free to clone this repo and come up will pull request.
-
 If you have some opinions regarding this tool or would like to propose a feature request -- create an **Issue** and we will have a chat about it.
+## How can I help?
+If you would like to contribute feel free to clone this repo and come up will pull request. Right now I have some features in mind you can possibly help me with:
+### New documentation releases tracking.
+This task is twofold. On a global scale we need to track if new release branch
+has been pushed to documentation portal. For instance `nokdoc showrels -p PRODUCT`
+will list all available releases. We need to check what releases were used by
+`batchgetlinks` command execution and compare it to the current list of releases.
+
+Sometimes docs get updated. This means that it is good to know if some doc
+has been updated inside every release trunk. This can be checked by Issue Date
+field.
+### Nokdoc server edition
+A possible solution to eliminate checking for updated docs is to run `batchgetlinks`
+on a daily basis.
+### Design enhancements
+If you feel like current design can be improved, share your templates/thoughts

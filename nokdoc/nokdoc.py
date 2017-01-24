@@ -258,6 +258,10 @@ def download_doc(s, dwnld_doc_url, remote_fname, username, local_fname):
     while i != 30:
         click.echo('  Wating for the documentation server to prepare the archive. Attempt #{}'.format(i))
         r = s.get(dwnld_doc_url, stream=True)
+        if r.status_code != requests.codes.ok:
+            click.echo('  !! Server encountered an error'
+                       ' with the code {}. Aborting'. format(r.status_code))
+            os.sys.exit()
         if r.headers['Content-type'] != 'archive/zip':
             time.sleep(5)
             i += 1
@@ -545,6 +549,7 @@ def getdocs(ctx, product, release, format):
 
     doc_dwnld_url = ''
 
+    # slicing last 100 lines where download link should be
     for line in r.text.splitlines()[-100:]:
         if 'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/down_col.pl' in line:
             doc_dwnld_url = re.search(r'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/down_col.pl?.*\.zip', line).group()

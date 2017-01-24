@@ -93,3 +93,4 @@ ENV/
 # RD: HTML/zip files generated as a result of nokdoc getdocs command
 /*.html
 *.zip
+docs

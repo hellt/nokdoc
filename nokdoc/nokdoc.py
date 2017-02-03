@@ -1,16 +1,17 @@
+import json
 import os
-from datetime import date
+import re
 import time
-import requests
+from datetime import date
+from pprint import pprint
+
 import certifi
 import click
-from pprint import pprint
-import re
-import json
-from jinja2 import Environment, PackageLoader
+import requests
 import tqdm
-from natsort import natsorted, ns
 import yaml
+from jinja2 import Environment, PackageLoader
+from natsort import natsorted, ns
 
 # disable unverified SSL certs warning
 # which occurs for infoproducts.alcatel-lucent.com server
@@ -256,7 +257,7 @@ def download_doc(s, dwnld_doc_url, remote_fname, username, local_fname):
     """
     i = 1
     while i != 30:
-        click.echo('  Wating for the documentation server to prepare the archive. Attempt #{}'.format(i))
+        click.echo('  Waiting for the documentation server to prepare the archive. Attempt #{}'.format(i))
         r = s.get(dwnld_doc_url, stream=True)
         if r.status_code != requests.codes.ok:
             click.echo('  !! Server encountered an error'
@@ -606,3 +607,34 @@ def batchgetlinks(ctx, finput):
                 release=''
             ctx.invoke(getlinks, product=product, release=release)
         os.chdir('..')
+
+
+def filename_formatter(s):
+    valid_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
+    filename = ''.join(c for c in s if c in valid_chars)
+    filename = filename.replace(' ', '_')
+    return filename
+
+
+@cli.command()
+@click.pass_context
+@click.option('-p', '--path', default='.',
+              help='Path to the directory with Nuage docs folders')
+def htmlfix(ctx, path):
+    '''
+    Renames Nuage documentation directories from DOC-ID to TITLE
+    '''
+    re_html_title = re.compile(r'<title>(.+)&mdash')
+
+    if os.path.isdir(path):
+        os.chdir(path)
+        for doc_section_dir in os.listdir(os.curdir):
+            if os.path.isdir(doc_section_dir):
+                with open(os.path.join(os.curdir, doc_section_dir, "index.html"), encoding="utf8") as f:
+                    content = f.read()
+                # content = open(os.path.join(os.curdir, doc_section_dir, "index.html"), encoding="utf8").read()
+                    try:
+                        new_dirname = filename_formatter(re_html_title.search(content).group(1).strip())
+                    except AttributeError:
+                        break
+                    os.rename(os.path.join(os.curdir, doc_section_dir), os.path.join(os.curdir, new_dirname))

@@ -2,6 +2,8 @@ import json
 import os
 import re
 import time
+import zipfile
+import string
 from datetime import date
 from pprint import pprint
 
@@ -79,6 +81,9 @@ def user_auth(s, login, pwd):
         click.echo('  Logged in successfully!')
         return s
 
+def id_generator(size=3, chars=string.ascii_uppercase + string.digits):
+    import random
+    return ''.join(random.sample(chars, size))
 
 @click.pass_context
 def parseDocdata(ctx, rawDoc):
@@ -619,22 +624,103 @@ def filename_formatter(s):
 @cli.command()
 @click.pass_context
 @click.option('-p', '--path', default='.',
-              help='Path to the directory with Nuage docs folders')
+              help='Path to the zip archive or to directory with unzipped Nuage docs folders')
+
 def htmlfix(ctx, path):
     '''
     Renames Nuage documentation directories from DOC-ID to TITLE
     '''
-    re_html_title = re.compile(r'<title>(.+)&mdash')
 
-    if os.path.isdir(path):
-        os.chdir(path)
+    import shutil
+    # import zlib
+
+    orig_cwd = os.path.abspath(os.path.curdir)
+    path_dir = os.path.abspath(os.path.dirname(path))
+
+    def fix_contents(dir_path):
+        """
+        Renaming docs dirs function
+        """
+        # regexp to match human readable doc name
+        re_html_title = re.compile(r'<title>(.+)&mdash')
+
+        # move to the temp dir
+        os.chdir(dir_path)
+
         for doc_section_dir in os.listdir(os.curdir):
             if os.path.isdir(doc_section_dir):
-                with open(os.path.join(os.curdir, doc_section_dir, "index.html"), encoding="utf8") as f:
-                    content = f.read()
-                # content = open(os.path.join(os.curdir, doc_section_dir, "index.html"), encoding="utf8").read()
-                    try:
-                        new_dirname = filename_formatter(re_html_title.search(content).group(1).strip())
-                    except AttributeError:
-                        break
-                    os.rename(os.path.join(os.curdir, doc_section_dir), os.path.join(os.curdir, new_dirname))
+                content = open(os.path.join(os.curdir, doc_section_dir, "index.html"), encoding="utf8").read()
+                try:
+                    new_dirname = filename_formatter(re_html_title.search(content).group(1).strip())
+                except AttributeError:
+                    break
+                os.renames(os.path.join(os.curdir, doc_section_dir), os.path.join(os.curdir, new_dirname))
+
+    def get_all_file_paths(directory):
+        """
+        Recursively walk the directory and get paths
+        to the files inside
+        """
+        # initializing empty file paths list
+        file_paths = []
+        click.echo(directory)
+        # crawling through directory and subdirectories
+        for root, _, files in os.walk(directory):
+            for filename in files:
+                filepath = os.path.join(root, filename)
+                file_paths.append(filepath)
+        # returning all file paths
+        return file_paths
+
+    click.echo('\n  ####### HTML DOC FIX #######')
+
+    if zipfile.is_zipfile(path):
+        click.echo('\n  Processing a zip archive "{}"...'.format(path))
+
+        os.chdir(path_dir)
+
+        # creating a temp dir to store unarchived data
+        tmp_dir_name = 'tmp_nokdoc_docs_{}'.format(id_generator())
+        os.mkdir(tmp_dir_name)
+        tmpdir_abspath = os.path.abspath(tmp_dir_name)
+
+        with zipfile.ZipFile(path, "r") as zf:
+            try:
+                zf.extractall(tmpdir_abspath)
+                click.echo('  Successfully unzipped documentation archive...')
+            except:
+                print('Could not unarchive the zip file')
+
+        # fix dir names
+        time.sleep(2)
+        fix_contents(tmpdir_abspath)
+
+        new_arch_fname = path
+        new_arch_abspath = os.path.join(path_dir, new_arch_fname)
+
+        with zipfile.ZipFile(new_arch_abspath, "w", compression=zipfile.ZIP_DEFLATED) as zfw:
+            try:
+                click.echo('  Archiving renamed documents...')
+                [zfw.write(x) for x in get_all_file_paths(os.curdir)]
+            except:
+                click.echo('  Failed to archive the zip file')
+
+        # deleting temp directory and files
+        click.echo('  Removing temporary files...')
+
+        # return to the original working directory
+        # and delete the temp dir
+        os.chdir(path_dir)
+        try:
+            shutil.rmtree(tmpdir_abspath)
+        except PermissionError:
+            click.echo('  Unable to remove temp directory')
+
+        click.echo('  Successfully created archive with renamed documents!'
+                   '\n    --> {}'.format(new_arch_abspath))
+
+    # option2: process directory with docs
+    if os.path.isdir(path):
+        click.echo('\n  Processing a directory "{}" with docs inside...'.format(path))
+        fix_contents(os.path.abspath(path))
+        click.echo('  Renamed doc dirs in the "{}" directory...'.format(os.path.abspath(path)))

@@ -1,9 +1,9 @@
 import json
 import os
 import re
+import string
 import time
 import zipfile
-import string
 from datetime import date
 from pprint import pprint
 
@@ -22,7 +22,8 @@ from natsort import natsorted, ns
 # entry point for un-auth access to docs -- https://support.alcatel-lucent.com/portal/web/support
 # then go select some product and click on Manual and guides section
 # this will open https://infoproducts.alcatel-lucent.com/cgi-bin/doc_list.pl
-# where with code explorer it is possible to see all the actual doc_name == doc_id pairs.
+# where with code explorer it is possible to see all the actual doc_name
+# == doc_id pairs.
 doc_id = {'nuage-vsp': '1-0000000000662',
           'nuage-vns': '1-0000000004080',
           'nuage': ['1-0000000000662', '1-0000000004080'],
@@ -62,7 +63,7 @@ get_doc_url = 'https://infoproducts.alcatel-lucent.com/cgi-bin/get_doc_list.pl'
 
 def user_auth(s, login, pwd):
     """
-    Logs in a user and stores session coockies for further tasks
+    Logs in a user and stores session cookies for further tasks
     """
 
     click.echo('  Logging you in...')
@@ -81,9 +82,11 @@ def user_auth(s, login, pwd):
         click.echo('  Logged in successfully!')
         return s
 
+
 def id_generator(size=3, chars=string.ascii_uppercase + string.digits):
     import random
     return ''.join(random.sample(chars, size))
+
 
 @click.pass_context
 def parseDocdata(ctx, rawDoc):
@@ -122,8 +125,8 @@ def parseDocdata(ctx, rawDoc):
         # and look for matched result
         # when requesting data from browser I cant see any bogus symbols
         # same issue was the reason to create get_json_resp() function
-        # TODO: this is not 100% reproducable. Analyze later and create an issue
-        # as a workaroung I will validate every </td>
+        # TODO: this is not 100% reproducible. Analyze later and create an issue
+        # as a workaround I will validate every </td>
         raw_entry = re.sub(r'</t\S*d>', '</td>', raw_entry)
 
         # example: https://regex101.com/r/NhwnOp/1
@@ -132,7 +135,9 @@ def parseDocdata(ctx, rawDoc):
             if 'a login is required for access' in td_contents[1] \
                     and not ctx.obj['LOGGED_IN']:
                 if show_restricted_docs_notification:
-                    click.echo('    The following documents are available to logged in users only. They will not be included in the documentation set...')
+                    click.echo(
+                        '    The following documents are available to logged in users only. '
+                        'They will not be included in the documentation set...')
                     show_restricted_docs_notification = False
                 click.echo('      ' + td_contents[0].strip())
                 continue
@@ -202,7 +207,8 @@ def parse_td_links(ctx, raw_links, doc_id):
             # since I use the HTTP API endpoint which has no direct HTML links
             # see comments in parseDocdata() func for further explanation
             if 'nuage' in ctx.obj['PRODUCT']:
-                link = 'https://infoproducts.alcatel-lucent.com/aces/htdocs/{}/index.html'.format(doc_id)
+                link = 'https://infoproducts.alcatel-lucent.com/aces/htdocs/{}/index.html'.format(
+                    doc_id)
 
         links.append((link, l_type))
     return links
@@ -262,7 +268,8 @@ def download_doc(s, dwnld_doc_url, remote_fname, username, local_fname):
     """
     i = 1
     while i != 30:
-        click.echo('  Waiting for the documentation server to prepare the archive. Attempt #{}'.format(i))
+        click.echo(
+            '  Waiting for the documentation server to prepare the archive. Attempt #{}'.format(i))
         r = s.get(dwnld_doc_url, stream=True)
         if r.status_code != requests.codes.ok:
             click.echo('  !! Server encountered an error'
@@ -272,16 +279,16 @@ def download_doc(s, dwnld_doc_url, remote_fname, username, local_fname):
             time.sleep(5)
             i += 1
         else:
-            total_dwnld_size = int(get_coll_size(s, remote_fname, username)) // 1024
+            total_dwnld_size = int(get_coll_size(
+                s, remote_fname, username)) // 1024
             with open(local_fname, 'wb') as f:
                 for data in tqdm.tqdm(r.iter_content(chunk_size=1024),
                                       unit='K', total=total_dwnld_size):
                     f.write(data)
                 click.echo('\n  File has been downloaded successfully '
-                           'to the following '
-                           'location\n   -> {}'.format(os.path.join(
-                                                       os.path.abspath(os.path.curdir),
-                                                       local_fname)))
+                           'to the following location\n'
+                           '    -> {}'.format(os.path.join(
+                               os.path.abspath(os.path.curdir), local_fname)))
             break
 
 
@@ -376,7 +383,8 @@ def cli(ctx, proxy, login):
     # log in and get cookies to get "protected" docs
     if login:
         click.echo('\n  ####### LOGIN #######')
-        pwd = click.prompt('  Please enter your password for a "{}" user'.format(login), hide_input=True)
+        pwd = click.prompt(
+            '  Please enter your password for a "{}" user'.format(login), hide_input=True)
         s = user_auth(s, login, pwd)
         ctx.obj['LOGGED_IN'] = True
         ctx.obj['USERNAME'] = login
@@ -407,18 +415,13 @@ def getlinks(ctx, product, release, format, sort):
 
     global doc_id
     global get_doc_url
-    # xpin = '''<div><table style='width: 100%;border-collapse:collapse'><tbody><tr style='border-top: 1px solid black !important;border-bottom: 1px solid black !important;'><th style='text-align: left;width: 55%;'>Title</th><th style='text-align: left;width: 12%;'>Document</th><th>Issue&#160;&#160;&#160;</th><th style='text-align: center;'>Issue Date</th><th style='text-align: left;'>Format</th></tr><tr style='background-color:#E9E9E9;' > <td style='font-weight: 600'>7450 ESS and 7750 SR Troubleshooting Guide </td><td style='size: 140px;font-weight: 500'><nobr>3HE 11475 AAAA TQZZA 01 <img title='Key means document is restricted and a login is required for access.' src='/images/prodcontent_key.gif'></nobr></td> <td style='text-align:center' class='T5'>1</td> <td style='text-align:center' class='T5'><nobr>Dec 8, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_doc_list.pl?entry_id=1-0000000002238&srch_how=Title&release=14.0' target='_self' ><img src='/images/pdficon.jpg' title='PDF document' width='20' height='20' style='border-style:none'></a></nobr></td></tr><tr style='background-color:#FFFFFF;' > <td style='font-weight: 600'>7450 ESS, 7750 SR, and 7950 XRS Multicast Routing Protocols Guide R14.0.R4 </td><td style='size: 140px;font-weight: 500'><nobr>3HE 10795 AAAB TQZZA 02 </nobr></td> <td style='text-align:center' class='T5'>2</td> <td style='text-align:center' class='T5'><nobr>Dec 2, 2016</nobr></td> <td><nobr>&#160;&#160;<a href='https://infoproducts.alcatel-lucent.com/cgi-bin/dbaccessfilename.cgi/3HE10795AAABTQZZA02_V1_7450 ESS 7750 SR and 7950 XRS Multicast Routing Protocols Guide R14.0.R4.pdf' target='_blank' ><img src='/images/pdficon.jpg' title='PDF document' width='20' height='20' style='border-style:none'></a></nobr></td></tr>
-    # '''
-    # root = html.fromstring(xpin)
-    # tmp = root.xpath('//td//text()|//a/@href')
-    # arr = [tmp[i:i + 6] for i in range(0, len(tmp), 6)]
-    # pprint(arr)
 
     # mapping of cli options for sotring and values for API calls
     sort_opts = {'title': 'Title, A-Z',
                  'issue_date': 'Issue Date'}
 
-    # used to map cli short_format notation to long_format which is passed to request
+    # used to map cli short_format notation to long_format which is passed to
+    # request
     long_format = ''
     # if format option is specified, rewrite acting format value
     if format:
@@ -446,9 +449,11 @@ def getlinks(ctx, product, release, format, sort):
             # redefine entry_id
             params.update({'entry_id': entry_id})
             # pprint(params)
-            responces.append(get_json_resp(ctx.obj['SESSION'].get(get_doc_url, params=params)))
+            responces.append(get_json_resp(
+                ctx.obj['SESSION'].get(get_doc_url, params=params)))
     else:
-        responces.append(get_json_resp(ctx.obj['SESSION'].get(get_doc_url, params=params)))
+        responces.append(get_json_resp(
+            ctx.obj['SESSION'].get(get_doc_url, params=params)))
         # responces.append(ctx.obj['SESSION'].get(get_doc_url, params=params).json())
     # with open('nuage.txt', 'w') as f:
     #     print(responces, file=f)
@@ -458,7 +463,8 @@ def getlinks(ctx, product, release, format, sort):
     # if no results were found format section will be empty
     if is_empty_list([i['proddata']['format']
                       for i in responces]):
-        click.echo('  No documents were found with the specified criteria. Exiting...')
+        click.echo(
+            '  No documents were found with the specified criteria. Exiting...')
         os.sys.exit()
 
     # num_docs_found_patt = re.compile(r"'>(\d+.+)</td")
@@ -522,7 +528,8 @@ def showrels(ctx, product):
               default='',
               help='Release version, use "showrels" command to list them')
 @click.option('-f', '--format', help='Specify documentation format to fetch.'
-              'If unspecified -> all types will be collected.', type=click.Choice(['pdf', 'html', 'zip']))
+              'If unspecified -> all types will be collected.',
+              type=click.Choice(['pdf', 'html', 'zip']))
 def getdocs(ctx, product, release, format):
     '''
     Downloads documentation collection for a given product family.
@@ -537,7 +544,8 @@ def getdocs(ctx, product, release, format):
 
     dwnld_doc_url = 'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/create_col.pl'
 
-    # used to map cli short_format notation to long_format which is passed to request
+    # used to map cli short_format notation to long_format which is passed to
+    # request
     long_format = ''
     # if format option is specified, rewrite acting format value
     if format:
@@ -558,9 +566,11 @@ def getdocs(ctx, product, release, format):
     # slicing last 100 lines where download link should be
     for line in r.text.splitlines()[-100:]:
         if 'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/down_col.pl' in line:
-            doc_dwnld_url = re.search(r'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/down_col.pl?.*\.zip', line).group()
+            doc_dwnld_url = re.search(
+                r'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/down_col.pl?.*\.zip', line).group()
 
-            # get file name without .zip extension to query for coll. dwnld size
+            # get file name without .zip extension to query for coll. dwnld
+            # size
             remote_fname = doc_dwnld_url.rsplit('=')[1][:-4]
 
             click.echo('  Collection will be available for download '
@@ -609,7 +619,7 @@ def batchgetlinks(ctx, finput):
             ctx.obj['PRODUCT'] = product
             # pprint(product + " " + release)
             if release is None:
-                release=''
+                release = ''
             ctx.invoke(getlinks, product=product, release=release)
         os.chdir('..')
 
@@ -625,7 +635,6 @@ def filename_formatter(s):
 @click.pass_context
 @click.option('-p', '--path', default='.',
               help='Path to the zip archive or to directory with unzipped Nuage docs folders')
-
 def htmlfix(ctx, path):
     '''
     Renames Nuage documentation directories from DOC-ID to TITLE
@@ -649,12 +658,15 @@ def htmlfix(ctx, path):
 
         for doc_section_dir in os.listdir(os.curdir):
             if os.path.isdir(doc_section_dir):
-                content = open(os.path.join(os.curdir, doc_section_dir, "index.html"), encoding="utf8").read()
+                content = open(os.path.join(
+                    os.curdir, doc_section_dir, "index.html"), encoding="utf8").read()
                 try:
-                    new_dirname = filename_formatter(re_html_title.search(content).group(1).strip())
+                    new_dirname = filename_formatter(
+                        re_html_title.search(content).group(1).strip())
                 except AttributeError:
                     break
-                os.renames(os.path.join(os.curdir, doc_section_dir), os.path.join(os.curdir, new_dirname))
+                os.renames(os.path.join(os.curdir, doc_section_dir),
+                           os.path.join(os.curdir, new_dirname))
 
     def get_all_file_paths(directory):
         """
@@ -721,6 +733,8 @@ def htmlfix(ctx, path):
 
     # option2: process directory with docs
     if os.path.isdir(path):
-        click.echo('\n  Processing a directory "{}" with docs inside...'.format(path))
+        click.echo(
+            '\n  Processing a directory "{}" with docs inside...'.format(path))
         fix_contents(os.path.abspath(path))
-        click.echo('  Renamed doc dirs in the "{}" directory...'.format(os.path.abspath(path)))
+        click.echo('  Renamed doc dirs in the "{}" directory...'.format(
+            os.path.abspath(path)))

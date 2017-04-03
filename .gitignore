@@ -93,4 +93,11 @@ ENV/
 # RD: HTML/zip files generated as a result of nokdoc getdocs command
 /*.html
 *.zip
+# dir with downloaded link docs
 docs
+# local testing dir
+test
+
+.DS_Store
+
+.vscode

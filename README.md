@@ -81,9 +81,11 @@ Options:
   --help            Show this message and exit.
 
 Commands:
-  getdocs   Downloads documentation collection for a...
-  getlinks  Gets a single HTML file with links to the...
-  showrels  Lists all available releases for a given...
+  batchgetlinks  Invokes getlinks command for a list of...
+  getdocs        Downloads documentation collection for a...
+  getlinks       Gets a single HTML file with links to the...
+  htmlfix        Renames Nuage documentation directories from...
+  showrels       Lists all available releases for a given...
 ```
 Let's explore what can be done with NokDoc.
 ### Guest access and logged users
@@ -197,6 +199,57 @@ For this purpose another small command was introduced:
   ####### SHOW RELEASES #######
   Checking available releases...
   Available releases for 7750sr family: 4.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, Arbor6.0, Arbor7.0, Arbor7.5, ArborCP5.7, ArborCP5.8p3, ArborCP5.8p4, ArborTMS5.6.P5, ArborTMS5.7.P4, ArborTMS5.8, arborTMS5.8P4, ArborTMS5.8P5, MG3.1, MG4.0, MG5.0, MG6.0, MG7.0, MG8.0
+```
+## Fixing documentation directories names
+Once you have downloaded Nuage documentation in html format, you might get lost once you peer into the unarchived directory:
+```shell
+rdodin@pc /d/System/Downloads/unarchived_docs
+$ ls
+3HE09895AAAN/  3HE10726AAAI/  3HE10733AAAI/  3HE11477AAAD/  README.txt
+3HE10560AAAI/  3HE10727AAAI/  3HE10736AAAI/  3HE11593AAAC/
+3HE10723AAAI/  3HE10730AAAI/  3HE10933AAAI/  3HE11966AAAB/
+3HE10724AAAI/  3HE10731AAAI/  3HE10974AAAI/  3HE12055AAAB/
+3HE10725AAAI/  3HE10732AAAI/  3HE11202AAAG/  3HE12105AAAA/
+```
+I am still in the process of learning all the `doc-id --> doc-title` so to help myself I incorporated a `htmlfix` command which will decode the directories names to human-readable versions:
+```shell
+rdodin@pc /d/System/Downloads/unarchived_docs
+$ ls
+Nuage_7850_VSA-8_Installation_Guide/
+Nuage_7850_VSA-VSG_Installation_Guide/
+Nuage_Docker_Integration_Guide/
+Nuage_Kubernetes_Integration_Guide/
+Nuage_Mesos_Integration_Guide/
+Nuage_OpenShift_Integration_Guide/
+# <omitted for brevity>
+```
+There are two possible options to do such a rename depending on what format do you keep your docs in:
+
+### **1 You have a zipped archive with docs**
+If you just downloaded an archive with HTML dirs inside and want to keep it in archive just with the proper names, navigate nokdoc to the archive like this:
+```shell
+ $ nokdoc htmlfix -p /d/System/Downloads/nokdoc__NUAGE__4.0.R8__HTML__2017_04_01.zip
+
+  ####### HTML DOC FIX #######
+
+  Processing a zip archive "D:/System/Downloads/nokdoc__NUAGE__4.0.R8__HTML__2017_04_01.zip"...
+  Successfully unzipped documentation archive...
+  Archiving renamed documents...
+.
+  Removing temporary files...
+  Successfully created archive with renamed documents!
+    --> D:/System/Downloads/nokdoc__NUAGE__4.0.R8__HTML__2017_04_01.zip
+```
+Now your original archive **will be rewritten** and contain meaningful directory names instead of original ones.
+### **2 You have an unzipped directory with docs**
+If you already unarchived docs and want to just rename the dirs, point nokdoc to the parent directory like in the following example:
+```
+$ nokdoc htmlfix -p /d/System/Downloads/unarchived_docs/
+
+  ####### HTML DOC FIX #######
+
+  Processing a directory "D:/System/Downloads/unarchived_docs/" with docs inside...
+  Renamed doc dirs in the "D:\System\Downloads\unarchived_docs" directory...
 ```
 # Contribution or requests?
 If you have some opinions regarding this tool or would like to propose a feature request -- create an **Issue** and we will have a chat about it.

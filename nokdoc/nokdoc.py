@@ -97,7 +97,7 @@ def parseDocdata(ctx, rawDoc):
     entry with its properties
     """
 
-    # using thts link no login required to get the list of nuage docs
+    # using this link no login required to get the list of nuage docs
     # but that list wont have links to HTML docs, only PDFs
     # though we can construct links to HTML by having doc_id only
     # https://infoproducts.alcatel-lucent.com/cgi-bin/get_doc_list.pl?&entry_id=1-0000000000662&srch_how=Full%20Text&srch_str=&release=4.0.R6.1
@@ -119,7 +119,7 @@ def parseDocdata(ctx, rawDoc):
     for raw_entry in raw_doc_entries:
         doc_data = {}  # dict to hold doc data for one particular entry
 
-        # this misterious additional symbols in responce data appeared again
+        # this mysterious additional symbols in responce data appeared again
         # now they messed with </td> tag in responce for nuage-vsp rel 4.0.r5
         # refer to this output https://regex101.com/r/1KdJHJ/2
         # and look for matched result
@@ -439,6 +439,7 @@ def getlinks(ctx, product, release, format, sort):
     params = {'entry_id': doc_id[product],
               'release': release.upper(),
               'format': long_format,
+              #   'how': 'all_prod',
               'sortby': sort_opts[sort]
               }
 

@@ -90,6 +90,10 @@ ENV/
 # Rope project settings
 .ropeproject
 
+.pylintrc
+
+batchgetlinks.yml
+
 # RD: HTML/zip files generated as a result of nokdoc getdocs command
 /*.html
 *.zip

@@ -37,7 +37,8 @@ doc_id = {'nuage-vsp': '1-0000000000662',
           '7705sar': '1-0000000002735',
           '7750sr': '1-0000000002238',
           '7950xrs': '1-0000000003922',
-          'vsr': '1-0000000004075'
+          'vsr': '1-0000000004075',
+          'nsp': '1-0000000004100'
           }
 
 # correlation between short names of formats as they passed in cli
@@ -535,7 +536,7 @@ def getdocs(ctx, product, release, format):
     '''
     Downloads documentation collection for a given product family.
     Optionally specify release version to fetch
-    OPtionally specify format of the docs to fetch
+    Optionally specify format of the docs to fetch
 
     Currently supported products: nuage, nuage-vsp, nuage-vns
     '''

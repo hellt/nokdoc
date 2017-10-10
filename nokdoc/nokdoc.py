@@ -38,7 +38,8 @@ doc_id = {'nuage-vsp': '1-0000000000662',
           '7750sr': '1-0000000002238',
           '7950xrs': '1-0000000003922',
           'vsr': '1-0000000004075',
-          'nsp': '1-0000000004100'
+          'nsp': '1-0000000004100',
+          '210wbx': '1-0000000003798'
           }
 
 # correlation between short names of formats as they passed in cli

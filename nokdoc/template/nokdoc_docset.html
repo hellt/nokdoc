@@ -11,6 +11,10 @@
 
     <title>NokDoc</title>
 
+    <!-- JQuery and plugins -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+    <!-- Filtering and highlighting of search results https://jsfiddle.net/julmot/bs69vcqL/ -->
+    <script src="https://cdn.jsdelivr.net/npm/mark.js@8.11.0/dist/jquery.mark.min.js"></script>
     <!-- Latest compiled and minified CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
 
@@ -18,7 +22,7 @@
     <link href="https://rawgit.com/hellt/bc4fc51d6f1b9584605517f5c8d6a5a0/raw/0c95004aab0b7158fb8d0485439fa2ec11b049a1/jumbotron-narrow.css" rel="stylesheet" type="text/css" />
 
     <!-- extra css for nokdoc.github.io only. Will contain extra css rules if needed -->
-    <link href="/static/css/docset1.css" rel="stylesheet" type="text/css" />
+    <link href="https://nokdoc.github.io/static/css/docset1.css" rel="stylesheet" type="text/css" />
 
     <style type="text/css">
         td .glyphicon {
@@ -29,10 +33,16 @@
         body {
             font-family: "Nokia Pure Text","Helvetica Neue",Helvetica,Arial,sans-serif
         }
+
+        mark {
+          background: rgb(155, 212, 250);
+          color: inherit;
+          padding: 0;
+        }
     </style>
     
     <!-- common scripts (like google analytics) applicable to nokdoc.github.io dir structure -->
-    <script src="/static/scripts/nokdoc_common.js"></script>
+    <script src="https://nokdoc.github.io/static/scripts/nokdoc_common.js"></script>
   </head>
 
   <body>
@@ -58,7 +68,10 @@
                   {% if release %}
                   release <code>{% filter upper %}{{ release }}{% endfilter %}</code>
                   {% endif %}
-                  <small>generated on {{gen_date}}</small></h3></div>
+                  <small>generated on {{gen_date}}</small>
+              </h3>
+              <input type="text" name="keyword" class="form-control input-sm" placeholder="Search term... Type in and press [ENTER]">
+          </div>
           <div class="col-md-12">
               <table class="table table-striped">
                 <thead>

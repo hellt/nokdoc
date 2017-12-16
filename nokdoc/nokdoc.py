@@ -430,6 +430,12 @@ def getlinks(ctx, product, release, format, sort):
     if format:
         long_format = formats[format]
 
+    # if `all` is passed as a release filter or release was not specified,
+    # fetch all releases and sort them by issue date
+    if release.upper() in ('ALL', ''):
+        sort = 'issue_date'
+        release = ""
+
     # for nuage family 'get_doc_url' URL differs from 7750
         # get_doc_url = 'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_get_doc_list.pl'
 

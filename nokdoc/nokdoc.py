@@ -144,14 +144,15 @@ def parseDocdata(ctx, rawDoc, check_permissions=False):
         # example: https://regex101.com/r/NhwnOp/1
         td_contents = td_contents_patt.findall(raw_entry)
         if td_contents:
-            if 'a login is required for access' in td_contents[1] \
-                    and not ctx.obj['LOGGED_IN']:
+            if (not ctx.obj['LOGGED_IN']) and ('a login is required for access' in td_contents[1]):
                 if show_restricted_docs_notification:
                     click.echo(
                         '    The following documents are available to logged in users only. '
                         'They will not be included in the documentation set...')
                     show_restricted_docs_notification = False
                 click.echo('      ' + td_contents[0].strip())
+                continue
+            if len(td_contents) <= 1:
                 continue
             # click.echo('Adding doc {}'.format(td_contents[0]))
             if check_permissions:
@@ -485,23 +486,38 @@ def getlinks(ctx, product, release, format, sort):
             params.update({'entry_id': entry_id})
             # pprint(params)
 
-            # getting doc data just to tell later if
-            # the docID is open or restricted
-            perm_responces.append(get_json_resp(
-                ctx.obj['SESSION'].get(get_doc_permissions_url, params=params)))
-            # getting doc data with authorized URL to get actual links
-            responces.append(get_json_resp(
-                ctx.obj['SESSION'].get(get_doc_url, params=params)))
+            for i in range(5):
+                try:
+                    # getting doc data just to tell later if
+                    # the docID is open or restricted
+                    resp1 = ctx.obj['SESSION'].get(
+                        get_doc_permissions_url, params=params)
+                    resp1.raise_for_status()
+                    perm_responces.append(get_json_resp(resp1))
+
+                    # getting doc data with authorized URL to get actual links
+                    resp2 = ctx.obj['SESSION'].get(get_doc_url, params=params)
+                    resp2.raise_for_status()
+                    responces.append(get_json_resp(resp2))
+                    break
+                except requests.exceptions.HTTPError:
+                    time.sleep(1)
+                    continue
     else:
-        perm_responces.append(get_json_resp(
-            ctx.obj['SESSION'].get(get_doc_permissions_url, params=params)))
-        responces.append(get_json_resp(
-            ctx.obj['SESSION'].get(get_doc_url, params=params)))
-        # responces.append(ctx.obj['SESSION'].get(get_doc_url, params=params).json())
-    # with open('nuage.txt', 'w') as f:
-    #     print(responces, file=f)
-    #     pprint(responces, stream=f)
-    # os.sys.exit()
+        for i in range(5):
+            try:
+                resp1 = ctx.obj['SESSION'].get(
+                    get_doc_permissions_url, params=params)
+                resp1.raise_for_status()
+                perm_responces.append(get_json_resp(resp1))
+
+                resp2 = ctx.obj['SESSION'].get(get_doc_url, params=params)
+                resp2.raise_for_status()
+                responces.append(get_json_resp(resp2))
+                break
+            except requests.exceptions.HTTPError:
+                time.sleep(1)
+                continue
 
     # if no results were found format section will be empty
     if is_empty_list([i['proddata']['format']

@@ -1,11 +1,12 @@
 import json
+import logging
 import os
 import re
 import string
 import time
 import zipfile
 from datetime import date
-from pprint import pprint
+from pprint import pprint, pformat
 
 import certifi
 import click
@@ -18,6 +19,9 @@ from natsort import natsorted, ns
 # disable unverified SSL certs warning
 # which occurs for infoproducts.alcatel-lucent.com server
 # requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
+
+# Log
+logging.basicConfig(filename='nokdoc_debug.log', level=logging.DEBUG)
 
 # entry point for un-auth access to docs -- https://support.alcatel-lucent.com/portal/web/support
 # then go select some product and click on Manual and guides section
@@ -43,6 +47,10 @@ doc_id = {'nuage-vsp': '1-0000000000662',
           'cmg': '1-0000000002139'
           }
 
+# key: doc_ID
+# value: is_restricted (bool). True means restricted
+docs_permissions = {}
+
 # correlation between short names of formats as they passed in cli
 # and their longer names as they go into HTTP requests.
 # TODO: add mobi and epub formats to html composer
@@ -61,7 +69,8 @@ formats = {'zip': 'Zip Collection',
 proxies = {'https': ''}
 
 # API endpoint for querying docs
-get_doc_url = 'https://infoproducts.alcatel-lucent.com/cgi-bin/get_doc_list.pl'
+get_doc_url = 'https://infoproducts.alcatel-lucent.com/aces/cgi-bin/au_get_doc_list.pl'
+get_doc_permissions_url = 'https://infoproducts.alcatel-lucent.com/cgi-bin/get_doc_list.pl'
 
 
 def user_auth(s, login, pwd):
@@ -92,7 +101,7 @@ def id_generator(size=3, chars=string.ascii_uppercase + string.digits):
 
 
 @click.pass_context
-def parseDocdata(ctx, rawDoc):
+def parseDocdata(ctx, rawDoc, check_permissions=False):
     """
     Parses a raw HTML document which comes as a reply from a GET request
     towards the documentation server.
@@ -145,7 +154,11 @@ def parseDocdata(ctx, rawDoc):
                 click.echo('      ' + td_contents[0].strip())
                 continue
             # click.echo('Adding doc {}'.format(td_contents[0]))
-            doc_data.update(parse_td(raw_td=td_contents))
+            if check_permissions:
+                docs_permissions.update(
+                    parse_td(raw_td=td_contents, check_permissions=True))
+            else:
+                doc_data.update(parse_td(raw_td=td_contents))
 
             # when dealing with combined product some docs might be in
             # both sections. Append only unique docs.
@@ -157,11 +170,13 @@ def parseDocdata(ctx, rawDoc):
 
 
 @click.pass_context
-def parse_td(ctx, raw_td):
+def parse_td(ctx, raw_td, check_permissions=False):
     """
     Dissects given <td> elements from a singe <tr> element. A single <tr>
     element represents a single document and its properties.
     Returns a dict with key as doc_id and value as a dict with doc properties
+
+    if `check_permissions` == True, then returned value is a dict {doc_id:is_restricted}
     """
     d = {}
 
@@ -170,19 +185,21 @@ def parse_td(ctx, raw_td):
     # key is doc_id
     key = re.search(r'>(.*?)<', raw_td[1]).group(1).strip()
 
-    # collect info if a doc is restricted to later show lock icon in HTML
-    # for those docs which are with a restricted access
-    if 'a login is required for access' in raw_td[1]:
-        is_restricted = True
-    else:
-        is_restricted = False
+    if check_permissions:
+        # collect info if a doc is restricted to later show lock icon in HTML
+        # for those docs which are with a restricted access
+        if 'a login is required for access' in raw_td[1]:
+            d[key] = True
+        else:
+            d[key] = False
 
-    d[key] = {'title': raw_td[0].strip(),
-              'issue': raw_td[2].strip(),
-              'issue_date': re.sub('<nobr>|</nobr>', '', raw_td[3]).strip(),
-              'links': parse_td_links(raw_links=raw_td[4], doc_id=key),
-              'restricted': is_restricted
-              }
+    else:
+        d[key] = {'title': raw_td[0].strip(),
+                  'issue': raw_td[2].strip(),
+                  'issue_date': re.sub('<nobr>|</nobr>', '', raw_td[3]).strip(),
+                  'links': parse_td_links(raw_links=raw_td[4], doc_id=key),
+                  'restricted': docs_permissions.get(key, True)
+                  }
     return d
 
 
@@ -205,13 +222,8 @@ def parse_td_links(ctx, raw_links, doc_id):
             l_type = 'ZIP'
         elif 'HTML' in url_n_type[1].upper():
             l_type = 'HTML'
-
-            # for nuage products I need to construct HTML href manually
-            # since I use the HTTP API endpoint which has no direct HTML links
-            # see comments in parseDocdata() func for further explanation
-            if 'nuage' in ctx.obj['PRODUCT']:
-                link = 'https://infoproducts.alcatel-lucent.com/aces/htdocs/{}/index.html'.format(
-                    doc_id)
+        else:
+            continue
 
         links.append((link, l_type))
     return links
@@ -247,7 +259,7 @@ def get_rels(s, product_id):
     returns a list of available releases for a given product
     '''
     params = {'entry_id': product_id}
-    return requests.get(get_doc_url, params=params).json()['proddata']['release']
+    return requests.get(get_doc_permissions_url, params=params).json()['proddata']['release']
 
 
 def get_common_rels(s, product_ids):
@@ -332,6 +344,7 @@ def get_json_resp(responce):
     nokdoc -l rdodin getlinks -p nuage-vns -r 4.0.r6
     '''
     try:
+        logging.debug(pformat(responce.text))
         json_resp = responce.json()
         return json_resp
     except json.decoder.JSONDecodeError:
@@ -416,6 +429,10 @@ def getlinks(ctx, product, release, format, sort):
     '''
     click.echo('\n  ####### GET LINKS #######')
 
+    # import logging
+
+    # logging.basicConfig(level=logging.DEBUG)
+
     global doc_id
     global get_doc_url
 
@@ -445,12 +462,20 @@ def getlinks(ctx, product, release, format, sort):
     # list with requests responces
     responces = []
 
+    # list with responces for permissions data
+    perm_responces = []
+
     params = {'entry_id': doc_id[product],
               'release': release.upper(),
               'format': long_format,
               #   'how': 'all_prod',
               'sortby': sort_opts[sort]
               }
+    # params = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
+
+    # some release are case sensitive
+    if release.upper().startswith('SAR-HM'):
+        params['release'] = params['release'].replace('SAR-HM', 'SAR-Hm')
 
     # if we are dealing with composed doc section (like 'nuage')
     # go through every enclosed doc_id and populate a list with responces
@@ -459,9 +484,17 @@ def getlinks(ctx, product, release, format, sort):
             # redefine entry_id
             params.update({'entry_id': entry_id})
             # pprint(params)
+
+            # getting doc data just to tell later if
+            # the docID is open or restricted
+            perm_responces.append(get_json_resp(
+                ctx.obj['SESSION'].get(get_doc_permissions_url, params=params)))
+            # getting doc data with authorized URL to get actual links
             responces.append(get_json_resp(
                 ctx.obj['SESSION'].get(get_doc_url, params=params)))
     else:
+        perm_responces.append(get_json_resp(
+            ctx.obj['SESSION'].get(get_doc_permissions_url, params=params)))
         responces.append(get_json_resp(
             ctx.obj['SESSION'].get(get_doc_url, params=params)))
         # responces.append(ctx.obj['SESSION'].get(get_doc_url, params=params).json())
@@ -485,10 +518,21 @@ def getlinks(ctx, product, release, format, sort):
     for i in responces:
         docdata += i['proddata']['docdata']
 
+    temp_data = ''
+    for p in perm_responces:
+        temp_data += p['proddata']['docdata']
+
     click.echo('\n  Checking documentation access rights...')
+
+    # invoke parseDocdata with check_permissions
+    # to populate the global dict that holds is_restricted property
+    # for each document ID
+    parseDocdata(temp_data, check_permissions=True)
 
     ctx.obj['PRODUCT'] = product
     docs_list = parseDocdata(docdata)
+    # pprint(docs_list)
+    # os.sys.exit()
 
     # if doc_list is empty --> abort
     if not docs_list:

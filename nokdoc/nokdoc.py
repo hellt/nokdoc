@@ -469,16 +469,11 @@ def getlinks(ctx, product, release, format, sort):
     perm_responces = []
 
     params = {'entry_id': doc_id[product],
-              'release': release.upper(),
+              'release': release,
               'format': long_format,
               #   'how': 'all_prod',
               'sortby': sort_opts[sort]
               }
-    # params = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
-
-    # some release are case sensitive
-    if release.upper().startswith('SAR-HM'):
-        params['release'] = params['release'].replace('SAR-HM', 'SAR-Hm')
 
     # if we are dealing with composed doc section (like 'nuage')
     # go through every enclosed doc_id and populate a list with responces
